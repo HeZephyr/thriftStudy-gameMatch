@@ -59,11 +59,23 @@ public:
     void match(){
         while(users.size() > 1){
             // printf("%d\n", int(users.size()));
-            auto user1 = users[0];
-            auto user2 = users[1];
-            users.erase(users.begin());
-            users.erase(users.begin());
-            save_result(user1.id, user2.id);
+            sort(users.begin(), users.end(), [&](User &a, User b) {
+                return a.score < b.score;
+            });
+            bool flag = true;
+            for( uint32_t i = 1; i < users.size(); ++ i) {
+                auto a = users[i - 1], b = users[i];
+                if(b.score - a.score <= 50) {
+                    users.erase(users.begin() + i, users.begin() + i + 1);
+
+                    save_result(a.id, b.id);
+                    flag = false;
+                    break;
+                }
+            }
+            if(flag){
+                break;
+            }
         }
     }
     void save_result(int id1, int id2){
