@@ -2,15 +2,19 @@
 // You should copy it to another filename to avoid overwriting it.
 
 #include "match_server/Match.h"
+#include "save_client/Save.h"
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TTransportUtils.h>
 
+#include <iostream>
 #include <mutex> // 锁的头文件
 #include <thread> // 线程的头文件
 #include <condition_variable> // 条件变量的头文件
-#include <queue> 
+#include <queue>
 #include <vector>
 
 using namespace ::apache::thrift;
@@ -19,6 +23,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::server;
 
 using namespace  ::match_service;
+using namespace  ::save_service;
 
 using namespace std;
 
@@ -63,6 +68,23 @@ public:
     }
     void save_result(int id1, int id2){
         printf("success\n%d 和 %d 匹配成功！\n", id1, id2);
+
+        // save_data
+        std::shared_ptr<TTransport> socket(new TSocket("123.57.47.211", 9090));
+        std::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+        std::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+        SaveClient client(protocol);
+        try {
+            transport->open();
+            // 在此之间实现自己的业务
+            client.save_data("acs_878", "461ff549", id1, id2);
+
+            // ----------------
+            cout << "数据保存成功！" << endl;
+            transport->close();
+        } catch(TException &e) {
+            cout << "ERROR:" << e.what() << endl;
+        }
     }
 }pool;
 class MatchHandler : virtual public MatchIf {
