@@ -51,35 +51,50 @@ struct MessageQueue{
 class Pool{
 private:
     vector<User> users; // 存储用户的池
+    vector<int> waitTime; // 记录用户等待时间
 public:
     void add(User user){
         // printf("%d\n", int(users.size()));
         users.push_back(user);
+        waitTime.push_back(0);
     }
     void remove(User user){
         // printf("%d\n", int(users.size()));
         for(unsigned int i = 0; i < users.size(); ++ i){
             if(users[i].id == user.id){
                 users.erase(users.begin() + i);
+                waitTime.erase(waitTime.begin() + i);
                 break;
             }
         }
     }
-    void match(){
-        while(users.size() > 1){
-            // printf("%d\n", int(users.size()));
-            sort(users.begin(), users.end(), [&](User &a, User b) {
-                return a.score < b.score;
-            });
-            bool flag = true;
-            for( uint32_t i = 1; i < users.size(); ++ i) {
-                auto a = users[i - 1], b = users[i];
-                if(b.score - a.score <= 50) {
-                    users.erase(users.begin() + i, users.begin() + i + 1);
+    bool check_match(int i, int j) {
+        auto a = users[i], b = users[j];
 
-                    save_result(a.id, b.id);
-                    flag = false;
-                    break;
+        int dt = abs(a.score - b.score);
+        int a_max_diff = waitTime[i] * 50, b_max_diff = waitTime[j] * 50;
+        return dt <= a_max_diff && dt <= b_max_diff;
+    }
+    void match(){
+        // 将所有人的等待秒数+1。
+        for(int i = 0; i < waitTime.size(); ++ i) {
+            ++ waitTime[i];
+        }
+        while(users.size() > 1) {
+            // printf("%d\n", int(users.size()));
+            bool flag = true;
+            for(int i = 0; i < users.size(); ++ i) {
+                for(int j = i + 1; j < users.size(); ++ j){
+                    if(check_match(i, j)) {
+                        auto a = users[i], b = users[j];
+                        users.erase(users.begin() + j); // 注意要先删除后面的
+                        users.erase(users.begin() + i);
+                        waitTime.erase(waitTime.begin() + j);
+                        waitTime.erase(waitTime.begin() + i);
+                        save_result(a.id, b.id);
+                        flag = false;
+                        break;
+                    }
                 }
             }
             if(flag) {
@@ -158,7 +173,10 @@ void consume_task(){
         unique_lock<mutex> lock(message_queue.m); // 加锁
         if(message_queue.q.empty()){
             // 如果为空，直接continue不作处理则一定会死循环。
-            message_queue.cv.wait(lock);
+            // message_queue.cv.wait(lock);
+            lock.unlock();
+            pool.match();
+            sleep(1); // 睡眠一秒
         } else{
             auto task = message_queue.q.front();
             message_queue.q.pop();
@@ -169,7 +187,6 @@ void consume_task(){
             } else if(task.type == "remove"){
                 pool.remove(task.user);
             }
-            pool.match();
         }
     }
 }
